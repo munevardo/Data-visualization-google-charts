@@ -3,8 +3,7 @@ const csvUrl = 'https://raw.githubusercontent.com/munevardo/Data-visualization-g
 
 let globalData = [];
 
-// Cargar Google Charts y ejecutar la app
-google.charts.load('current', { 'packages': ['corechart', 'bar'] });
+google.charts.load('current', { 'packages': ['corechart'] });
 google.charts.setOnLoadCallback(initApp);
 
 async function initApp() {
@@ -13,82 +12,47 @@ async function initApp() {
         if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
 
         const textData = await response.text();
-        // Usamos el nuevo motor de parseo a prueba de fallos
-        globalData = parseCSVAdvanced(textData);
+        globalData = parseCSVStateMachine(textData);
 
         drawAllCharts();
 
-        // Listeners interactivos
         document.getElementById('countryFilter').addEventListener('change', drawChart3);
         document.getElementById('genreFilter').addEventListener('change', drawChart4);
         window.addEventListener('resize', drawAllCharts);
 
     } catch (error) {
         console.error("Error cargando los datos:", error);
-        document.getElementById('dashboard').innerHTML = `
-            <div class="col-12 text-center mt-5">
-                <div class="alert alert-danger">
-                    <strong>Error:</strong> No se pudo cargar el dataset desde GitHub.
-                </div>
-            </div>`;
     }
 }
 
-// NUEVO PARSER AVANZADO: Soporta saltos de línea internos, comillas dobles y detecta el delimitador.
-function parseCSVAdvanced(str) {
-    // 1. Autodetectar si el archivo usa comas o punto y coma
-    const firstLine = str.split('\n')[0];
-    const delimiter = (firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length ? ';' : ',';
-
+// LECTOR STATE MACHINE: Infalible contra comillas dobles y comas internas
+function parseCSVStateMachine(str) {
     const arr = [];
     let quote = false;
-    let col = 0, row = 0;
+    let row = 0, col = 0;
 
     for (let c = 0; c < str.length; c++) {
         let cc = str[c], nc = str[c + 1];
         arr[row] = arr[row] || [];
         arr[row][col] = arr[row][col] || '';
 
-        // Manejar comillas escapadas ("")
-        if (cc === '"' && quote && nc === '"') {
-            arr[row][col] += cc;
-            ++c; // Saltamos la siguiente comilla
-            continue;
-        }
-        // Entrar o salir de comillas
-        if (cc === '"') {
-            quote = !quote;
-            continue;
-        }
-        // Nueva columna
-        if (cc === delimiter && !quote) {
-            ++col;
-            continue;
-        }
-        // Nueva fila (Soporta \r\n de Windows y \n de Mac/Linux)
-        if (cc === '\r' && nc === '\n' && !quote) {
-            ++row; col = 0; ++c; continue;
-        }
-        if (cc === '\n' && !quote) {
-            ++row; col = 0; continue;
-        }
-        if (cc === '\r' && !quote) {
-            ++row; col = 0; continue;
-        }
-
-        // Añadir caracter normal
+        if (cc === '"' && quote && nc === '"') { arr[row][col] += cc; ++c; continue; }
+        if (cc === '"') { quote = !quote; continue; }
+        if (cc === ',' && !quote) { ++col; continue; }
+        if (cc === '\r' && nc === '\n' && !quote) { ++row; col = 0; ++c; continue; }
+        if (cc === '\n' && !quote) { ++row; col = 0; continue; }
+        if (cc === '\r' && !quote) { ++row; col = 0; continue; }
         arr[row][col] += cc;
     }
 
-    // Mapear el arreglo bidimensional a objetos JSON usando los encabezados
     const headers = arr[0].map(h => h.trim());
-    return arr.slice(1).map(row => {
+    return arr.slice(1).map(r => {
         let obj = {};
         headers.forEach((h, i) => {
-            obj[h] = row[i] ? row[i].trim() : null;
+            obj[h] = r[i] ? r[i].trim() : null;
         });
         return obj;
-    }).filter(r => r[headers[0]]); // Filtrar filas vacías o corruptas
+    }).filter(r => r.show_id); // Filtra cualquier basura residual
 }
 
 function drawAllCharts() {
@@ -99,7 +63,7 @@ function drawAllCharts() {
 }
 
 // ==========================================
-// Desafío 1: Proporción Películas vs Series
+// Desafío 1: Proporción
 // ==========================================
 function drawChart1() {
     let movies = 0, tvShows = 0;
@@ -128,29 +92,29 @@ function drawChart1() {
 // ==========================================
 function drawChart2() {
     let yearlyData = {};
+
     globalData.forEach(d => {
         if (!d.date_added) return;
-        let yearMatch = d.date_added.match(/\d{2,4}$/);
-        if (yearMatch) {
-            let year = parseInt(yearMatch[0]);
-            year = year < 100 ? 2000 + year : year;
-            if (!yearlyData[year]) yearlyData[year] = { Movie: 0, TVShow: 0 };
-            if (d.type && d.type.includes('Movie')) yearlyData[year].Movie++;
-            if (d.type && d.type.includes('TV Show')) yearlyData[year].TVShow++;
+        let parts = d.date_added.split(',');
+        if (parts.length > 1) {
+            let year = parseInt(parts[1].trim());
+            if (!isNaN(year)) {
+                if (!yearlyData[year]) yearlyData[year] = { Movie: 0, TVShow: 0 };
+                if (d.type === 'Movie') yearlyData[year].Movie++;
+                else if (d.type === 'TV Show') yearlyData[year].TVShow++;
+            }
         }
     });
 
-    var data = new google.visualization.DataTable();
-    data.addColumn('number', 'Año');
-    data.addColumn('number', 'Películas');
-    data.addColumn('number', 'Series de TV');
-
+    let dataArray = [['Año', 'Películas', 'Series de TV']];
     Object.keys(yearlyData).sort().forEach(year => {
-        data.addRow([parseInt(year), yearlyData[year].Movie, yearlyData[year].TVShow]);
+        dataArray.push([year, yearlyData[year].Movie, yearlyData[year].TVShow]);
     });
 
+    var data = google.visualization.arrayToDataTable(dataArray);
+
     var options = {
-        hAxis: { title: 'Año de incorporación', format: '0000' },
+        hAxis: { title: 'Año de incorporación' },
         vAxis: { title: 'Títulos añadidos' },
         colors: ['#E50914', '#564d4d'],
         legend: { position: 'top' },
@@ -161,36 +125,44 @@ function drawChart2() {
 }
 
 // ==========================================
-// Desafío 3: Top Países Productores
+// Desafío 3: Top Países Productores (SOLUCIÓN DE AGRUPACIÓN)
 // ==========================================
 function drawChart3() {
     let limit = parseInt(document.getElementById('countryFilter').value);
     let countryCounts = {};
 
     globalData.forEach(d => {
-        if (!d.country) return;
-        let countries = d.country.split(',').map(c => c.trim());
-        countries.forEach(c => { if (c) countryCounts[c] = (countryCounts[c] || 0) + 1; });
+        if (d.country) {
+            // AQUÍ ESTÁ TU LÓGICA: Tomamos solo el índice [0] del split (el primer país)
+            let primaryCountry = d.country.split(',')[0].replace(/"/g, '').trim();
+
+            if (primaryCountry.length > 1) {
+                countryCounts[primaryCountry] = (countryCounts[primaryCountry] || 0) + 1;
+            }
+        }
     });
 
     let sortedCountries = Object.entries(countryCounts)
         .sort((a, b) => b[1] - a[1]).slice(0, limit);
 
-    var data = new google.visualization.DataTable();
-    data.addColumn('string', 'País');
-    data.addColumn('number', 'Títulos');
-    data.addColumn({ type: 'string', role: 'style' });
-    data.addColumn({ type: 'string', role: 'tooltip' });
+    let dataArray = [
+        ['País', 'Títulos', { role: 'style', type: 'string' }, { role: 'tooltip', type: 'string' }]
+    ];
 
     if (sortedCountries.length > 0) {
         let maxVal = sortedCountries[0][1];
         sortedCountries.forEach(item => {
             let intensity = 0.4 + (0.6 * (item[1] / maxVal));
             let colorStyle = `color: rgba(229, 9, 20, ${intensity})`;
-            let tooltipText = `${item[0]}: ${item[1].toLocaleString()} títulos`;
-            data.addRow([item[0], item[1], colorStyle, tooltipText]);
+            let tooltipText = `${item[0]}: ${item[1].toLocaleString()} títulos principales`;
+
+            dataArray.push([item[0], item[1], colorStyle, tooltipText]);
         });
+    } else {
+        dataArray.push(['Sin datos', 0, 'color: #ccc', 'N/A']);
     }
+
+    var data = google.visualization.arrayToDataTable(dataArray);
 
     var options = {
         hAxis: { title: 'Cantidad' },
@@ -208,29 +180,39 @@ function drawChart4() {
     let genreCounts = {};
 
     globalData.forEach(d => {
-        // Aseguramos que coincide el tipo de contenido exactamente
         if (d.type && d.type.trim() === contentType && d.listed_in) {
-            let genres = d.listed_in.split(',').map(g => g.trim());
-            genres.forEach(g => { if (g) genreCounts[g] = (genreCounts[g] || 0) + 1; });
+            // Para géneros sí mantenemos el conteo de todos, ya que una película suele pertenecer a varios géneros válidos a la vez.
+            let genres = d.listed_in.split(',');
+            genres.forEach(g => {
+                let cleanGenre = g.replace(/"/g, '').trim();
+                if (cleanGenre.length > 1) {
+                    genreCounts[cleanGenre] = (genreCounts[cleanGenre] || 0) + 1;
+                }
+            });
         }
     });
 
     let sortedGenres = Object.entries(genreCounts)
         .sort((a, b) => b[1] - a[1]).slice(0, 7);
 
-    var data = new google.visualization.DataTable();
-    data.addColumn('string', 'Género');
-    data.addColumn('number', 'Títulos');
-    data.addColumn({ type: 'string', role: 'style' });
-    data.addColumn({ type: 'string', role: 'tooltip' });
+    let dataArray = [
+        ['Género', 'Títulos', { role: 'style', type: 'string' }, { role: 'tooltip', type: 'string' }]
+    ];
 
     const palette = ['#E50914', '#B81D24', '#8C2B30', '#5E383B', '#F5A623', '#4A90E2', '#50E3C2'];
 
-    sortedGenres.forEach((item, index) => {
-        let colorStyle = `color: ${palette[index % palette.length]}`;
-        let tooltipText = `Categoría: ${item[0]}\nTotal: ${item[1].toLocaleString()} títulos`;
-        data.addRow([item[0], item[1], colorStyle, tooltipText]);
-    });
+    if (sortedGenres.length > 0) {
+        sortedGenres.forEach((item, index) => {
+            let colorStyle = `color: ${palette[index % palette.length]}`;
+            let tooltipText = `Categoría: ${item[0]}\nTotal: ${item[1].toLocaleString()} títulos`;
+
+            dataArray.push([item[0], item[1], colorStyle, tooltipText]);
+        });
+    } else {
+        dataArray.push(['Sin datos', 0, 'color: #ccc', 'N/A']);
+    }
+
+    var data = google.visualization.arrayToDataTable(dataArray);
 
     var options = {
         vAxis: { title: 'Cantidad' },
