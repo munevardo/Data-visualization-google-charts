@@ -1,0 +1,127 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Netflix Analytics Dashboard</title>
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Google Charts -->
+    <script src="https://www.gstatic.com/charts/loader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+    <!-- Estilos -->
+    <link rel="stylesheet" href="style.css?v=1000">
+</head>
+
+<body>
+
+    <!-- HEADER -->
+<div class="header text-white">
+    <div class="header-overlay">
+        <h1>Netflix Analytics Dashboard 🎬</h1>
+        <p class="intro">
+Este dashboard permite analizar la composición, evolución y distribución del catálogo de Netflix, identificando patrones clave por tipo de contenido, país y género.
+</p>
+    </div>
+</div>
+
+    <!-- KPI -->
+    <div class="kpi-container">
+        <div class="kpi">
+            🎬 <span id="totalTitles">0</span>
+            <p>Total títulos</p>
+        </div>
+
+        <div class="kpi">
+            🌍 <span id="totalCountries">0</span>
+            <p>Países</p>
+        </div>
+
+        <div class="kpi">
+            📅 <span id="latestYear">2000</span>
+            <p>último año de incorporación</p>
+        </div>
+    </div>
+
+    <!-- CONTENIDO -->
+    <div class="container-fluid dashboard-container my-4">
+
+        <!-- FILA 1 -->
+        <div class="row g-4">
+
+            <!-- GRÁFICO 1 -->
+            <div class="col-12 col-xl-6">
+                <div class="card-custom">
+                    <h5>Distribución del contenido</h5>
+                    <div id="piechart"></div>
+                    <p class="insight">
+                        La composición del catálogo muestra un predominio de películas frente a series, lo que sugiere una estrategia de volumen más orientada al consumo puntual que al contenido episódico.
+                    </p>
+                </div>
+            </div>
+
+            <!-- GRÁFICO 2 -->
+            <div class="col-12 col-xl-6">
+                <div class="card-custom">
+                    <h5>Evolución del catálogo</h5>
+                    <div id="linechart"></div>
+                    <p class="insight">
+                        Se observa un crecimiento sostenido del catálogo, con una aceleración significativa a partir de 2018.
+                    </p>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- FILA 2 -->
+        <div class="row g-4 mt-1">
+
+            <!-- GRÁFICO 3 -->
+            <div class="col-12 col-xl-6">
+                <div class="card-custom">
+                    <h5>Top países productores</h5>
+
+                    <select id="topN" class="form-select mb-2">
+                        <option value="3">Top 3</option>
+                        <option value="5">Top 5</option>
+                        <option value="10">Top 10</option>
+                    </select>
+
+                    <div id="countrychart"></div>
+                    <p class="insight">
+                        Texto inicial (se actualizará automáticamente)
+                    </p>
+                </div>
+            </div>
+
+            <!-- GRÁFICO 4 -->
+            <div class="col-12 col-md-6">
+                <div class="card-custom">
+                    <h5>Géneros más frecuentes</h5>
+
+                    <select id="typeFilter" class="form-select mb-2">
+                        <option value="Todos">Todos</option>
+                        <option value="Movie">Películas</option>
+                        <option value="TV Show">Series</option>
+                    </select>
+
+                    <div id="genrechart"></div>
+
+                    <p class="insight" id="genreInsight">
+                        El género drama concentra la mayor parte del catálogo, seguido por comedia y acción.
+                    </p>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- JS -->
+    <script src="script.js?v=200"></script>
+
+</body>
+</html>
